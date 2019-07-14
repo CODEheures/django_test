@@ -1,32 +1,30 @@
-# from django.shortcuts import render
-from django.http import HttpResponse
+from django.shortcuts import render, get_object_or_404
 from .models import Album, Artist, Contact, Booking
 # Create your views here.
 
 
 def index(request):
-    albums = Album.objects.filter(available=True).order_by('-created_at')[:4]
-    formated_albums = ["<li><a href='/store/album/{}'>{}</a></li>"
-                           .format(album.id, album.title) for album in albums]
-    message = "<ul>{}</ul>".format("\n".join(formated_albums))
-
-    return HttpResponse(message)
+    albums = Album.objects.filter(available=True).order_by('-created_at')[:6]
+    context = {'albums': albums}
+    return render(request, 'store/index.html', context)
 
 
 def listing(request):
     albums = Album.objects.filter(available=True)
-    formated_albums = ["<li><a href='/store/album/{}'>{}</a></li>"
-              .format(album.id, album.title) for album in albums]
-    message = "<ul>{}</ul>".format("\n".join(formated_albums))
-
-    return HttpResponse(message)
+    context = {'albums': albums}
+    return render(request, 'store/listing.html', context)
 
 
 def detail(request, album_id):
-    album = Album.objects.get(pk=int(album_id))
-    artists = " ".join(artist.name for artist in album.artists.all())
-    message = "Le nom de l'album est {}. Il a été écrit par {}".format(album.title, artists)
-    return HttpResponse(message)
+    album = get_object_or_404(Album, pk=int(album_id))
+    artists_name = " ".join(artist.name for artist in album.artists.all())
+    context = {
+        'album_title': album.title,
+        'artists_name': artists_name,
+        'album_id': album.id,
+        'thumbnail': album.picture
+    }
+    return render(request, 'store/detail.html', context)
 
 def search(request):
     query = request.GET['query']
@@ -38,10 +36,9 @@ def search(request):
     if not albums.exists():
         albums = Album.objects.filter(artists__name__icontains=query)
 
-    if not albums.exists():
-        message = "Aucun album ne correspond à votre recherche"
-    else:
-        liste_html = ["<li>{}</li>".format(album.title) for album in albums]
-        message = "Votre recherche: <ul>{}</ul>".format("\n".join(liste_html))
-
-    return HttpResponse(message)
+    title = "Résultats pour la requête {}".format(query)
+    context = {
+        'title': title,
+        'albums': albums
+    }
+    return render(request, 'store/search.html', context)
