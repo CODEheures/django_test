@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from .models import Album, Artist, Contact, Booking
 # Create your views here.
 
@@ -10,18 +11,56 @@ def index(request):
 
 
 def listing(request):
-    albums = Album.objects.filter(available=True)
-    context = {'albums': albums}
+    albums_list = Album.objects.filter(available=True)
+    paginator = Paginator(albums_list, 3)
+    page = request.GET.get('page')
+    try:
+        albums = paginator.page(page)
+    except PageNotAnInteger:
+        albums = paginator.page(1)
+    except EmptyPage:
+        albums = paginator.page(paginator.num_pages)
+
+    context = {
+        'albums': albums,
+        'paginate': True
+    }
     return render(request, 'store/listing.html', context)
 
 
 def detail(request, album_id):
     album = get_object_or_404(Album, pk=int(album_id))
     artists_name = " ".join(artist.name for artist in album.artists.all())
+
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        name = request.POST.get('name')
+
+        contact = Contact.objects.filter(email=email)
+        if not contact.exists():
+            contact = Contact.objects.create(
+                email = email,
+                name = name
+            )
+        else:
+            contact = contact[0]
+        booking = Booking.objects.create(
+            album = album,
+            contact = contact
+        )
+
+        album.available = False
+        album.save()
+        context = {
+            'album_title': album.title
+        }
+        return render(request, 'store/merci.html', context)
+
     context = {
         'album_title': album.title,
         'artists_name': artists_name,
         'album_id': album.id,
+        'album_available': album.available,
         'thumbnail': album.picture
     }
     return render(request, 'store/detail.html', context)
