@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.db import transaction, IntegrityError
 from .models import Album, Artist, Contact, Booking
 from .forms import ContactForm, ParagraphErrorList
 # Create your views here.
@@ -46,31 +47,34 @@ def detail(request, album_id):
             email = form.cleaned_data['email']
             name = form.cleaned_data['name']
 
-            contact = Contact.objects.filter(email=email)
-            if not contact.exists():
-                contact = Contact.objects.create(
-                    email = email,
-                    name = name
-                )
-            else:
-                contact = contact[0]
-            booking = Booking.objects.create(
-                album = album,
-                contact = contact
-            )
+            try:
+                with transaction.atomic():
+                    contact = Contact.objects.filter(email=email)
+                    if not contact.exists():
+                        contact = Contact.objects.create(
+                            email = email,
+                            name = name
+                        )
+                    else:
+                        contact = contact[0]
+                    booking = Booking.objects.create(
+                        album = album,
+                        contact = contact
+                    )
 
-            album.available = False
-            album.save()
-            context = {
-                'album_title': album.title
-            }
-            return render(request, 'store/merci.html', context)
-        else:
-            context['errors'] = form.errors.items()
+                    album.available = False
+                    album.save()
+                    context = {
+                        'album_title': album.title
+                    }
+                    return render(request, 'store/merci.html', context)
+            except IntegrityError:
+                form.errors['internal'] = "Une erreur est survenue pendant votre réservation. Merci de réessayer"
+
     else:
         form = ContactForm()
 
-
+    context['errors'] = form.errors.items()
     context['form'] = form
     return render(request, 'store/detail.html', context)
 
