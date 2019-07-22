@@ -1,1 +1,1 @@
-web: gunicorn disquaire_project.wsgi
+web: gunicorn disquaire_project/disquaire_project.wsgi
